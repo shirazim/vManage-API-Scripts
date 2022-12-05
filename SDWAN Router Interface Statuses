@@ -1,0 +1,44 @@
+
+<# 
+Author: Michael Shirazi
+Date: 12/4/2022
+Description: This script uses the vManage API which allows you to pull the interface statuses from every SDWAN router within your organization.
+#>
+
+$Authentication = curl --location -g -k -i --request POST 'https://<vmanage_IP>/j_security_check' --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'j_username=<Username>' --data-urlencode 'j_password=<Password>'
+$Token = ($Authentication -match "JSESSIONID").Substring(23,77)
+
+$interfaces = @{pageinfo = @{moreentries = 'True'}}
+$startID = 1
+$filename = Get-Date -Format "MM-dd"
+
+while ($interfaces.pageinfo.moreentries -eq 'True') {
+    Write-Host $startID
+    $Interfaces = curl "https://<vmanageIP>/dataservice/data/device/state/Interface?startId=$startID&count=10000" -k -H "Cookie: JSESSIONID=$token" 
+    $interfaces = $interfaces | ConvertFrom-Json
+    foreach($Interface in $interfaces.data){
+        if ($interface.'vdevice-host-name' -match "R01" -and $interface.'ifname' -eq 'ge0/5' -and $interface.'af-type' -eq "Ipv4"){
+            [PSCustomObject]@{
+                Name = $Interface.'vdevice-host-name'
+                IP = $interface.'vdevice-name'
+                Ifname = $Interface.ifname
+                admin = $Interface.'if-admin-status'
+                oper = $Interface.'if-oper-status'
+                Description = $Interface.desc
+             } | export-csv "$HOME\desktop\R01_$filename.csv" -Append
+        }
+        elseif ($interface.'vdevice-host-name' -match "R02" -and $interface.'ifname' -eq 'ge0/4' -and $interface.'af-type' -eq "Ipv4") {
+            [PSCustomObject]@{
+                Name = $Interface.'vdevice-host-name'
+                IP = $interface.'vdevice-name'
+                Ifname = $Interface.ifname
+                admin = $Interface.'if-admin-status'
+                oper = $Interface.'if-oper-status'
+                Description = $Interface.desc
+             } | export-csv "$HOME\Desktop\R02_$filename.csv" -Append
+        }
+        
+    } 
+
+    $startID = $Interfaces.pageInfo.endId    }
+    
